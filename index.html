@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>自杀风险评估 — C-SSRS 哥伦比亚量表</title>
+<style>
+  :root {
+    --bg: #faf9f7;
+    --card: #ffffff;
+    --text: #2d2d2d;
+    --sub: #6b6b6b;
+    --accent: #4a7c9b;
+    --accent-hover: #3a6a87;
+    --warn-low: #e8a838;
+    --warn-mid: #e07b3c;
+    --warn-high: #c0392b;
+    --border: #e5e0da;
+    --radius: 12px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.7; min-height: 100vh;
+  }
+  .container { max-width: 720px; margin: 0 auto; padding: 40px 20px 80px; }
+
+  /* Header */
+  .header { text-align: center; padding: 48px 0 32px; }
+  .header h1 { font-size: 28px; font-weight: 600; letter-spacing: -0.3px; margin-bottom: 8px; }
+  .header .subtitle { color: var(--sub); font-size: 15px; }
+
+  /* Disclaimer Banner */
+  .disclaimer-banner {
+    background: #fff8e6; border: 1px solid #f0d78c; border-radius: var(--radius);
+    padding: 16px 20px; margin-bottom: 28px; font-size: 13px; color: #7a6a3c; line-height: 1.6;
+  }
+  .disclaimer-banner strong { color: #c0392b; }
+
+  /* Progress */
+  .progress-wrap { margin-bottom: 32px; }
+  .progress-bar {
+    height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .progress-fill { height: 100%; background: var(--accent); transition: width 0.4s ease; border-radius: 2px; }
+  .progress-text { font-size: 13px; color: var(--sub); text-align: right; }
+
+  /* Card */
+  .card { background: var(--card); border-radius: var(--radius); padding: 32px 36px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); border: 1px solid var(--border); margin-bottom: 20px; }
+  .card h3 { font-size: 18px; margin-bottom: 8px; font-weight: 600; }
+  .card .q-label { font-size: 16px; margin-bottom: 18px; color: var(--text); }
+  .card .q-hint { font-size: 13px; color: var(--sub); margin-bottom: 16px; font-style: italic; }
+
+  /* Options */
+  .options { display: flex; flex-direction: column; gap: 10px; }
+  .opt-btn {
+    display: block; width: 100%; text-align: left; padding: 14px 18px;
+    border: 1.5px solid var(--border); border-radius: 8px; background: #fcfbfa;
+    cursor: pointer; font-size: 15px; color: var(--text); transition: all 0.15s;
+    font-family: inherit;
+  }
+  .opt-btn:hover { border-color: var(--accent); background: #f5f9fb; }
+  .opt-btn.selected { border-color: var(--accent); background: #eef5f9; font-weight: 500; }
+
+  /* Nav */
+  .nav-row { display: flex; gap: 12px; justify-content: space-between; margin-top: 24px; }
+  .btn {
+    padding: 12px 28px; border-radius: 8px; font-size: 15px; font-weight: 500;
+    cursor: pointer; border: none; font-family: inherit; transition: all 0.15s;
+  }
+  .btn-back { background: #f0ede8; color: var(--text); }
+  .btn-back:hover { background: #e5e0da; }
+  .btn-next { background: var(--accent); color: #fff; }
+  .btn-next:hover { background: var(--accent-hover); }
+  .btn-next:disabled { background: #c4cdd4; cursor: not-allowed; }
+  .btn-cta { background: var(--warn-high); color: #fff; font-size: 16px; }
+  .btn-cta:hover { background: #a93226; }
+
+  /* Results */
+  .result-header { text-align: center; padding: 32px 0; }
+  .risk-badge {
+    display: inline-block; padding: 10px 28px; border-radius: 999px;
+    font-size: 20px; font-weight: 700; color: #fff; letter-spacing: 0.5px;
+  }
+  .risk-low { background: var(--warn-low); }
+  .risk-moderate { background: var(--warn-mid); }
+  .risk-high { background: var(--warn-high); }
+
+  .score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 24px 0; }
+  .score-item { background: #f9f7f4; border-radius: 8px; padding: 16px; text-align: center; }
+  .score-item .val { font-size: 26px; font-weight: 700; color: var(--accent); }
+  .score-item .lbl { font-size: 13px; color: var(--sub); margin-top: 2px; }
+
+  .analysis-block { margin-top: 20px; }
+  .analysis-block h4 { font-size: 16px; margin-bottom: 10px; }
+  .analysis-block p, .analysis-block li { font-size: 14px; color: #555; line-height: 1.8; }
+  .analysis-block ul { padding-left: 20px; margin: 8px 0; }
+  .analysis-block li { margin-bottom: 4px; }
+
+  .recommendation {
+    background: #f4f8fb; border-left: 4px solid var(--accent); border-radius: 0 8px 8px 0;
+    padding: 20px 24px; margin: 24px 0; font-size: 14px; line-height: 1.8;
+  }
+  .recommendation.urgent { background: #fdf3f2; border-left-color: var(--warn-high); }
+
+  .crisis-box {
+    background: #fff5f3; border: 2px solid var(--warn-high); border-radius: var(--radius);
+    padding: 24px; margin: 28px 0; text-align: center;
+  }
+  .crisis-box h4 { color: var(--warn-high); font-size: 17px; margin-bottom: 12px; }
+  .crisis-box .phone { font-size: 22px; font-weight: 700; color: var(--warn-high); letter-spacing: 1px; }
+  .crisis-box .label { font-size: 13px; color: #999; margin-top: 4px; }
+
+  .footer-note { text-align: center; color: #bbb; font-size: 12px; margin-top: 48px; padding: 20px 0; }
+  .footer-note a { color: #999; }
+
+  @media (max-width: 600px) {
+    .container { padding: 20px 12px 60px; }
+    .card { padding: 24px 20px; }
+    .header h1 { font-size: 22px; }
+    .score-grid { grid-template-columns: 1fr; }
+    .nav-row { flex-direction: column-reverse; }
+    .btn { width: 100%; text-align: center; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>🕊️ 自杀风险评估</h1>
+    <p class="subtitle">哥伦比亚自杀严重程度量表（C-SSRS）· 自评筛检版</p>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="disclaimer-banner" id="disclaimerBanner">
+    <strong>⚠️ 重要声明：</strong>本工具仅用于心理健康自评参考，<strong>不能替代专业临床诊断</strong>。评估结果由算法生成，不代表医学意见。如果您正处于危机中，请立即拨打心理援助热线或前往最近的医院急诊。<br>
+    <span style="display:block;margin-top:6px;"><strong>🆘 24小时心理援助热线：400-161-9995</strong>（希望24热线）</span>
+  </div>
+
+  <!-- Questionnaire Area -->
+  <div id="questionnaire"></div>
+
+  <!-- Results Area (hidden initially) -->
+  <div id="results" style="display:none;"></div>
+
+  <!-- Footer -->
+  <div class="footer-note">
+    数据仅在您的浏览器本地处理，不会上传至任何服务器。<br>
+    量表来源：Columbia-Suicide Severity Rating Scale (C-SSRS) — Columbia University
+  </div>
+
+</div>
+
+<script>
+// ========== C-SSRS 问题定义 ==========
+const SECTIONS = [
+  {
+    id: 'ideation',
+    title: '第一部分：自杀意念（最近一个月）',
+    intro: '以下问题询问您在过去一个月中的想法和感受。请如实作答。',
+    questions: [
+      {
+        id: 'q1', text: '在过去的一个月里，您是否希望自己已经死了，或者希望自己可以一直睡下去不再醒来？',
+        hint: '例如：觉得生活没有意义、想长眠不醒。',
+        options: [
+          { value: 0, label: '否 —— 完全没有过这样的想法' },
+          { value: 1, label: '是 —— 有过这样的想法' },
+        ]
+      },
+      {
+        id: 'q2', text: '在过去的一个月里，您是否曾经有过任何想要结束自己生命的念头？',
+        hint: '不一定是具体的计划，仅仅是"想了结自己"的念头。',
+        options: [
+          { value: 0, label: '否 —— 完全没有' },
+          { value: 1, label: '是 —— 有过自杀的念头' },
+        ]
+      },
+      {
+        id: 'q3', text: '在过去的一个月里，您是否想过用什么方式结束自己的生命？',
+        hint: '例如：想过吃药、跳楼、用刀等具体方式。',
+        options: [
+          { value: 0, label: '否 —— 没有想过具体方式' },
+          { value: 2, label: '是 —— 想过具体方式，但没有打算实施' },
+          { value: 3, label: '是 —— 想过方式，且有一定程度想实施' },
+        ]
+      },
+      {
+        id: 'q4', text: '在过去的一个月里，您是否曾经有过实施自杀的意图或冲动？（即使没有具体的计划）',
+        hint: '"意图"意味着您真的考虑过要采取行动，而不仅仅是想想而已。',
+        options: [
+          { value: 0, label: '否 —— 完全没有实施意图' },
+          { value: 3, label: '是 —— 有过一些想要付诸行动的想法' },
+          { value: 4, label: '是 —— 有过明确的实施冲动' },
+        ]
+      },
+      {
+        id: 'q5', text: '在过去的一个月里，您是否已经制定过具体的自杀计划？或者已经开始做某些准备？',
+        hint: '例如：写遗书、整理财务、准备工具、勘察地点等。',
+        options: [
+          { value: 0, label: '否 —— 没有任何计划或准备' },
+          { value: 4, label: '是 —— 想过具体步骤，但还没开始准备' },
+          { value: 5, label: '是 —— 已经制定了详细计划' },
+          { value: 5, label: '是 —— 已经开始做准备了' },
+        ]
+      },
+    ]
+  },
+  {
+    id: 'intensity',
+    title: '第二部分：意念强度（仅当存在自杀意念时）',
+    intro: '如果您在过去一个月中有过自杀意念，请回答以下关于意念强度的补充问题。如果没有，将自动跳过。',
+    condition: function(answers) {
+      return Object.values(answers).some(v => v > 0);
+    },
+    questions: [
+      {
+        id: 'i1', text: '这些自杀念头出现的频率是？',
+        options: [
+          { value: 1, label: '少于每周一次' },
+          { value: 2, label: '每周一次' },
+          { value: 3, label: '每周 2-5 次' },
+          { value: 4, label: '每天或几乎每天' },
+          { value: 5, label: '每天多次' },
+        ]
+      },
+      {
+        id: 'i2', text: '这些念头每次持续多长时间？',
+        options: [
+          { value: 1, label: '几秒钟 —— 一闪而过' },
+          { value: 2, label: '几分钟' },
+          { value: 3, label: '一小时以内' },
+          { value: 4, label: '1-4 小时' },
+          { value: 5, label: '大部分时间（超过 4 小时）' },
+        ]
+      },
+      {
+        id: 'i3', text: '您能在多大程度上控制或抑制这些念头？',
+        options: [
+          { value: 1, label: '完全能控制 —— 可以轻易打消' },
+          { value: 2, label: '大部分时候能控制' },
+          { value: 3, label: '有一定困难 —— 需要努力才能转移注意力' },
+          { value: 4, label: '很难控制 —— 念头反复出现' },
+          { value: 5, label: '完全无法控制 —— 念头完全占据大脑' },
+        ]
+      },
+      {
+        id: 'i4', text: '有什么因素阻止您实施自杀？（如家人、信仰、对死亡的恐惧等）',
+        options: [
+          { value: 1, label: '有很强的阻碍因素 —— 绝对不会实施' },
+          { value: 2, label: '有一些阻碍因素 —— 大概率不会实施' },
+          { value: 3, label: '阻碍因素有一定作用' },
+          { value: 4, label: '阻碍因素很少 —— 不太在意后果' },
+          { value: 5, label: '没有任何阻碍因素' },
+        ]
+      },
+      {
+        id: 'i5', text: '您产生自杀念头的主要原因是什么？',
+        options: [
+          { value: 1, label: '完全为了引起他人注意或寻求帮助' },
+          { value: 2, label: '主要是为了引起注意，但也有一些真实的结束意愿' },
+          { value: 3, label: '一半为了结束痛苦，一半希望引起重视' },
+          { value: 4, label: '主要是想真正结束生命' },
+          { value: 5, label: '完全是为了结束生命，与引起注意无关' },
+        ]
+      },
+    ]
+  },
+  {
+    id: 'behavior',
+    title: '第三部分：自杀行为（有生以来）',
+    intro: '以下问题询问您一生中是否有过实际的自杀相关行为。无论多久以前，都请如实回答。',
+    questions: [
+      {
+        id: 'b1', text: '您一生中是否曾经实际采取过自杀行为（自杀未遂）？',
+        hint: '指任何实际的、有意图的自我伤害行为，且目的是结束生命。',
+        options: [
+          { value: 0, label: '否 —— 从未有过' },
+          { value: 5, label: '是 —— 有过 1 次' },
+          { value: 5, label: '是 —— 有过 2 次' },
+          { value: 5, label: '是 —— 有过 3 次及以上' },
+        ]
+      },
+      {
+        id: 'b2', text: '您是否曾经在即将实施自杀行为时被人或环境打断？',
+        hint: '已经开始了行动流程，但被外力中断了（非自身意愿）。',
+        options: [
+          { value: 0, label: '否 —— 从未有过' },
+          { value: 3, label: '是 —— 有过被打断的经历' },
+        ]
+      },
+      {
+        id: 'b3', text: '您是否曾经准备实施自杀，但在开始前自己主动停止了？',
+        hint: '已经做好了准备，但在最后一刻自己决定不做了。',
+        options: [
+          { value: 0, label: '否 —— 从未有过' },
+          { value: 3, label: '是 —— 有过自己喊停的经历' },
+        ]
+      },
+      {
+        id: 'b4', text: '您是否曾经为自杀做过准备性的行为？',
+        hint: '例如：购买/收集药物、购买/准备工具、写遗书、处理个人物品、勘察地点等。',
+        options: [
+          { value: 0, label: '否 —— 从未有过' },
+          { value: 4, label: '是 —— 做过准备性行为，但没有实际尝试' },
+        ]
+      },
+    ]
+  },
+];
+
+// ========== 状态管理 ==========
+let currentSectionIdx = 0;
+let currentQIdx = 0;
+let allAnswers = {};  // { q1: value, i1: value, b1: value, ... }
+
+// 扁平化问题列表（用于进度条）
+function getAllQuestions() {
+  const qs = [];
+  for (let si = 0; si < SECTIONS.length; si++) {
+    const sec = SECTIONS[si];
+    if (sec.condition && !sec.condition(allAnswers)) continue;
+    for (let qi = 0; qi < sec.questions.length; qi++) {
+      qs.push({ sectionIdx: si, qIdx: qi });
+    }
+  }
+  return qs;
+}
+
+function getFlatIndex() {
+  const all = getAllQuestions();
+  for (let i = 0; i < all.length; i++) {
+    if (all[i].sectionIdx === currentSectionIdx && all[i].qIdx === currentQIdx) return i;
+  }
+  return all.length;
+}
+
+// ========== 渲染 ==========
+function render() {
+  const qs = getAllQuestions();
+  const flatIdx = getFlatIndex();
+  const total = qs.length;
+  const pct = total > 0 ? Math.round((flatIdx / total) * 100) : 100;
+
+  // Progress bar
+  let html = `
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-text">${flatIdx} / ${total} 题</div>
+    </div>`;
+
+  if (flatIdx >= total) {
+    // All done — show results
+    document.getElementById('questionnaire').innerHTML = html;
+    showResults();
+    document.getElementById('disclaimerBanner').style.display = 'none';
+    return;
+  }
+
+  const sec = SECTIONS[currentSectionIdx];
+  const q = sec.questions[currentQIdx];
+
+  // Section intro
+  if (currentQIdx === 0) {
+    html += `<div class="card" style="margin-bottom:20px;">
+      <h3>${sec.title}</h3>
+      <p style="color:var(--sub);font-size:14px;margin-top:4px;">${sec.intro}</p>
+    </div>`;
+  }
+
+  // Question card
+  html += `<div class="card">
+    <div class="q-label"><span style="color:var(--accent);font-weight:600;">第 ${flatIdx+1}/${total} 题</span> &nbsp;·&nbsp; ${q.text}</div>
+    ${q.hint ? `<div class="q-hint">${q.hint}</div>` : ''}
+    <div class="options">`;
+
+  const currentVal = allAnswers[q.id];
+  for (const opt of q.options) {
+    const sel = currentVal === opt.value ? ' selected' : '';
+    html += `<button class="opt-btn${sel}" onclick="selectAnswer('${q.id}', ${opt.value})">${opt.label}</button>`;
+  }
+
+  html += `</div>
+    <div class="nav-row">
+      <button class="btn btn-back" onclick="goBack()" ${flatIdx === 0 ? 'disabled style="visibility:hidden"' : ''}>← 上一题</button>
+      <button class="btn btn-next" onclick="goNext()" ${currentVal === undefined ? 'disabled' : ''}>${flatIdx === total - 1 ? '查看结果 →' : '下一题 →'}</button>
+    </div>
+  </div>`;
+
+  document.getElementById('questionnaire').innerHTML = html;
+}
+
+function selectAnswer(qId, value) {
+  allAnswers[qId] = value;
+  render();
+}
+
+function goNext() {
+  const sec = SECTIONS[currentSectionIdx];
+  const q = sec.questions[currentQIdx];
+  if (allAnswers[q.id] === undefined) return;
+
+  // Next question within section
+  if (currentQIdx < sec.questions.length - 1) {
+    currentQIdx++;
+    render();
+    return;
+  }
+
+  // Next section
+  if (currentSectionIdx < SECTIONS.length - 1) {
+    currentSectionIdx++;
+    currentQIdx = 0;
+    // Check if next section's condition is met
+    const nextSec = SECTIONS[currentSectionIdx];
+    if (nextSec.condition && !nextSec.condition(allAnswers)) {
+      // Skip this section
+      if (currentSectionIdx < SECTIONS.length - 1) {
+        currentSectionIdx++;
+        currentQIdx = 0;
+      } else {
+        // Last section skipped, show results
+      }
+    }
+    render();
+    return;
+  }
+
+  // All done
+  render();  // Will trigger showResults
+}
+
+function goBack() {
+  if (currentQIdx > 0) {
+    currentQIdx--;
+    render();
+    return;
+  }
+  if (currentSectionIdx > 0) {
+    currentSectionIdx--;
+    const sec = SECTIONS[currentSectionIdx];
+    // Skip backward over sections whose condition isn't met
+    while (sec.condition && !sec.condition(allAnswers) && currentSectionIdx > 0) {
+      currentSectionIdx--;
+    }
+    currentQIdx = SECTIONS[currentSectionIdx].questions.length - 1;
+    render();
+  }
+}
+
+// ========== 评分与风险评估 ==========
+function calculateRisk() {
+  const q1 = allAnswers.q1 || 0;
+  const q2 = allAnswers.q2 || 0;
+  const q3 = allAnswers.q3 || 0;
+  const q4 = allAnswers.q4 || 0;
+  const q5 = allAnswers.q5 || 0;
+  const b1 = allAnswers.b1 || 0;
+  const b2 = allAnswers.b2 || 0;
+  const b3 = allAnswers.b3 || 0;
+  const b4 = allAnswers.b4 || 0;
+
+  // Ideation score (0-5 scale)
+  const ideationSeverity = Math.max(q1, q2, q3, q4, q5);
+  const hasIdeation = ideationSeverity > 0;
+
+  // Intensity score
+  let intensityScore = 0;
+  let intensityCount = 0;
+  if (hasIdeation) {
+    const iKeys = ['i1','i2','i3','i4','i5'];
+    for (const k of iKeys) {
+      if (allAnswers[k] !== undefined) {
+        intensityScore += allAnswers[k];
+        intensityCount++;
+      }
+    }
+  }
+  const avgIntensity = intensityCount > 0 ? intensityScore / intensityCount : 0;
+
+  // Behavior score
+  const behaviorScore = b1 + b2 + b3 + b4;
+  const hasBehavior = behaviorScore > 0;
+
+  // Risk classification (C-SSRS algorithm)
+  let riskLevel, riskLabel, riskClass;
+  if (ideationSeverity >= 4 || b1 >= 5 || b4 >= 4) {
+    riskLevel = 3; riskLabel = '高风险'; riskClass = 'risk-high';
+  } else if (ideationSeverity >= 2 || b2 >= 3 || b3 >= 3) {
+    riskLevel = 2; riskLabel = '中度风险'; riskClass = 'risk-moderate';
+  } else if (hasIdeation || hasBehavior) {
+    riskLevel = 1; riskLabel = '低风险'; riskClass = 'risk-low';
+  } else {
+    riskLevel = 0; riskLabel = '目前未检出明显风险'; riskClass = 'risk-low';
+  }
+
+  // Total composite score (for display)
+  const totalScore = ideationSeverity * 5 + Math.round(avgIntensity * 4) + behaviorScore;
+
+  return {
+    riskLevel, riskLabel, riskClass,
+    ideationSeverity, hasIdeation,
+    avgIntensity, intensityScore, intensityCount,
+    behaviorScore, hasBehavior,
+    totalScore,
+    answers: {
+      q1, q2, q3, q4, q5,
+      b1_moreThanOnce: b1 >= 5,
+      b2_interrupted: b2 >= 3,
+      b3_aborted: b3 >= 3,
+      b4_preparatory: b4 >= 4,
+    }
+  };
+}
+
+function showResults() {
+  const r = calculateRisk();
+
+  let riskBadge = '';
+  if (r.riskLevel === 0) {
+    riskBadge = `<span class="risk-badge" style="background:#5a9e6f;">🟢 ${r.riskLabel}</span>`;
+  } else if (r.riskLevel === 1) {
+    riskBadge = `<span class="risk-badge risk-low">🟡 ${r.riskLabel}</span>`;
+  } else if (r.riskLevel === 2) {
+    riskBadge = `<span class="risk-badge risk-moderate">🟠 ${r.riskLabel}</span>`;
+  } else {
+    riskBadge = `<span class="risk-badge risk-high">🔴 ${r.riskLabel}</span>`;
+  }
+
+  // Detailed analysis
+  let analysisHtml = '';
+  const a = r.answers;
+
+  // Ideation breakdown
+  analysisHtml += `<div class="analysis-block"><h4>📋 自杀意念评估</h4><ul>`;
+  if (!r.hasIdeation) {
+    analysisHtml += `<li>在过去一个月中，<strong>未检出</strong>自杀意念。</li>`;
+  } else {
+    if (a.q1) analysisHtml += `<li>存在<strong>希望死亡</strong>的被动意念。</li>`;
+    if (a.q2) analysisHtml += `<li>存在<strong>非特定性自杀想法</strong>。</li>`;
+    if (a.q3 >= 2) analysisHtml += `<li>已想过<strong>具体的自杀方式</strong>（方法层面）。${a.q3 >= 3 ? '有一定实施倾向。' : ''}</li>`;
+    if (a.q4 >= 3) analysisHtml += `<li>存在<strong>实施自杀的意图/冲动</strong>。${a.q4 >= 4 ? '意图较为明确。' : ''}</li>`;
+    if (a.q5 >= 4) analysisHtml += `<li>⚠️ 已制定<strong>具体自杀计划</strong>或已有<strong>准备性行为</strong>。这是高危信号。</li>`;
+    if (r.avgIntensity > 0) {
+      analysisHtml += `<li>意念强度指数：<strong>${r.avgIntensity.toFixed(1)}/5</strong>（${r.avgIntensity < 2 ? '较低' : r.avgIntensity < 3.5 ? '中等偏高' : '很高'}）</li>`;
+    }
+  }
+  analysisHtml += `</ul></div>`;
+
+  // Behavior breakdown
+  analysisHtml += `<div class="analysis-block"><h4>📋 自杀行为史（有生以来）</h4><ul>`;
+  if (!r.hasBehavior) {
+    analysisHtml += `<li>无实际自杀行为史。</li>`;
+  } else {
+    if (a.b1_moreThanOnce) analysisHtml += `<li>⚠️ 有<strong>自杀未遂</strong>史。既往尝试是未来风险的最强预测因子。</li>`;
+    if (a.b2_interrupted) analysisHtml += `<li>曾有即将实施时<strong>被外力打断</strong>的经历。</li>`;
+    if (a.b3_aborted) analysisHtml += `<li>曾在最后时刻<strong>自行中止</strong>自杀计划。</li>`;
+    if (a.b4_preparatory) analysisHtml += `<li>⚠️ 有过<strong>自杀准备行为</strong>（购买工具、勘察地点等）。</li>`;
+  }
+  analysisHtml += `</ul></div>`;
+
+  // Risk interpretation
+  analysisHtml += `<div class="analysis-block"><h4>🔍 解读</h4>`;
+  if (r.riskLevel === 0) {
+    analysisHtml += `<p>根据 C-SSRS 量表评分，您目前的回答<strong>未显示明显自杀风险</strong>。如果您正经历情绪困扰，建议通过日常自我关怀、运动、社交支持等方式保持心理韧性。</p>`;
+  } else if (r.riskLevel === 1) {
+    analysisHtml += `<p>您存在一定程度的<strong>自杀意念</strong>，但尚未形成具体计划或强烈意图。这种情况在压力大、情绪低落时并不罕见。建议您：</p><ul>
+      <li>与信任的家人或朋友<strong>坦诚沟通</strong></li>
+      <li>考虑寻求<strong>心理咨询</strong>（线上/线下均可）</li>
+      <li>监控这些念头的频率和强度变化</li>
+    </ul>`;
+  } else if (r.riskLevel === 2) {
+    analysisHtml += `<p>您目前处于<strong>中度自杀风险</strong>——存在明确的意念和一定的计划或意图倾向。这需要<strong>认真对待</strong>：</p><ul>
+      <li><strong>尽快预约精神科医生或心理治疗师</strong></li>
+      <li>告诉至少一个您信任的人您目前的状况</li>
+      <li>移除住所内的危险物品（大量药物、锐器等）</li>
+      <li>保存心理援助热线到手机通讯录</li>
+    </ul>`;
+  } else {
+    analysisHtml += `<p>⚠️ 您目前处于<strong>高自杀风险</strong>状态。这不是虚惊——您需要<strong>立即获得专业帮助</strong>：</p><ul>
+      <li><strong>立即拨打心理援助热线</strong>（见下方）</li>
+      <li>如果冲动强烈，<strong>立即前往最近的医院急诊科</strong></li>
+      <li>不要独处 —— 打电话给家人/朋友陪在您身边</li>
+      <li>自杀念头是暂时的，但死亡是永久的 —— 请给帮助一个机会</li>
+    </ul>`;
+  }
+  analysisHtml += `</div>`;
+
+  // Recommendations
+  let recClass = r.riskLevel >= 3 ? ' urgent' : '';
+  analysisHtml += `<div class="recommendation${recClass}">
+    <h4>${r.riskLevel >= 3 ? '🆘 紧急建议' : '💡 专业建议'}</h4>`;
+  if (r.riskLevel >= 3) {
+    analysisHtml += `<p>请<strong>立即</strong>联系以下资源之一：</p><ul>
+      <li>拨打 <strong>120</strong> 急救电话，或直接前往最近的<strong>综合医院急诊科</strong></li>
+      <li>拨打 <strong>110</strong>，警方可协助紧急送医</li>
+      <li>联系您的主治精神科医生或心理治疗师</li>
+    </ul>`;
+  } else if (r.riskLevel >= 2) {
+    analysisHtml += `<p>建议在<strong>48小时内</strong>预约精神科或心理科门诊进行评估。</p>`;
+  } else if (r.riskLevel >= 1) {
+    analysisHtml += `<p>建议在未来<strong>1-2周内</strong>进行一次心理咨询。</p>`;
+  }
+  analysisHtml += `</div>`;
+
+  // Crisis resources
+  analysisHtml += `<div class="crisis-box">
+    <h4>🆘 全国心理援助资源</h4>
+    <div style="margin:12px 0;">
+      <div class="phone">400-161-9995</div>
+      <div class="label">希望24热线 · 24小时 · 免费</div>
+    </div>
+    <div style="margin:12px 0;">
+      <div class="phone">010-82951332</div>
+      <div class="label">北京心理危机研究与干预中心 · 24小时</div>
+    </div>
+    <div style="margin:12px 0;">
+      <div class="phone">12320</div>
+      <div class="label">全国公共卫生公益热线</div>
+    </div>
+    <p style="font-size:13px;color:#888;margin-top:14px;">这些热线都是<strong>免费</strong>且<strong>保密</strong>的。你不必独自承受。</p>
+  </div>`;
+
+  // Score summary
+  const severityLabels = ['无', '被动死亡愿望', '非特异性自杀想法', '有方法无意图', '有一定意图', '有计划/准备'];
+  analysisHtml += `<div class="analysis-block">
+    <h4>📊 评分详情</h4>
+    <div class="score-grid">
+      <div class="score-item"><div class="val">${severityLabels[Math.min(r.ideationSeverity, 5)]}</div><div class="lbl">意念严重程度</div></div>
+      <div class="score-item"><div class="val">${r.avgIntensity.toFixed(1)} / 5</div><div class="lbl">意念强度均值</div></div>
+      <div class="score-item"><div class="val">${r.behaviorScore}</div><div class="lbl">行为风险分</div></div>
+      <div class="score-item"><div class="val">${r.totalScore}</div><div class="lbl">综合评分</div></div>
+    </div>
+  </div>`;
+
+  // Restart button
+  analysisHtml += `<div style="text-align:center;margin-top:32px;">
+    <button class="btn btn-back" onclick="location.reload()">🔄 重新测评</button>
+  </div>`;
+
+  document.getElementById('results').innerHTML = `
+    <div class="result-header">${riskBadge}</div>
+    <div class="card">${analysisHtml}</div>
+  `;
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('questionnaire').style.display = 'none';
+}
+
+// ========== 初始化 ==========
+window.addEventListener('DOMContentLoaded', () => {
+  // Check if user is returning to results
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('done') === '1') {
+    const saved = localStorage.getItem('cssrs_answers');
+    const savedRisk = localStorage.getItem('cssrs_risk');
+    if (saved && savedRisk) {
+      allAnswers = JSON.parse(saved);
+      const risk = JSON.parse(savedRisk);
+      currentSectionIdx = SECTIONS.length; // force done
+      render();
+      return;
+    }
+  }
+  render();
+});
+
+// Override showResults to save state
+const origShowResults = showResults;
+showResults = function() {
+  origShowResults();
+  localStorage.setItem('cssrs_answers', JSON.stringify(allAnswers));
+  localStorage.setItem('cssrs_risk', JSON.stringify(calculateRisk()));
+};
+</script>
+</body>
+</html>
