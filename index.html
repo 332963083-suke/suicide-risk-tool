@@ -213,7 +213,8 @@ const SECTIONS = [
     title: '第二部分：意念强度（仅当存在自杀意念时）',
     intro: '如果您在过去一个月中有过自杀意念，请回答以下关于意念强度的补充问题。如果没有，将自动跳过。',
     condition: function(answers) {
-      return Object.values(answers).some(v => v > 0);
+      // 只检查意念部分的答案(q1-q5)，不检查强度和行为部分
+      return ['q1','q2','q3','q4','q5'].some(k => (answers[k] || 0) > 0);
     },
     questions: [
       {
@@ -351,6 +352,15 @@ function render() {
       <div class="progress-text">${flatIdx} / ${total} 题</div>
     </div>`;
 
+  // Safety: if current section is excluded by conditions, find the first valid section
+  while (currentSectionIdx < SECTIONS.length) {
+    const curSec = SECTIONS[currentSectionIdx];
+    if (!curSec.condition || curSec.condition(allAnswers)) break;
+    // Condition not met — move forward
+    currentSectionIdx++;
+    currentQIdx = 0;
+  }
+
   if (flatIdx >= total) {
     // All done — show results
     document.getElementById('questionnaire').innerHTML = html;
@@ -409,26 +419,20 @@ function goNext() {
     return;
   }
 
-  // Next section
-  if (currentSectionIdx < SECTIONS.length - 1) {
+  // Next section — loop to skip sections whose condition isn't met
+  while (currentSectionIdx < SECTIONS.length - 1) {
     currentSectionIdx++;
     currentQIdx = 0;
-    // Check if next section's condition is met
     const nextSec = SECTIONS[currentSectionIdx];
-    if (nextSec.condition && !nextSec.condition(allAnswers)) {
-      // Skip this section
-      if (currentSectionIdx < SECTIONS.length - 1) {
-        currentSectionIdx++;
-        currentQIdx = 0;
-      } else {
-        // Last section skipped, show results
-      }
+    if (!nextSec.condition || nextSec.condition(allAnswers)) {
+      // Section condition met (or no condition) — enter this section
+      render();
+      return;
     }
-    render();
-    return;
+    // Condition not met — skip and try next section
   }
 
-  // All done
+  // All sections done or skipped — show results
   render();  // Will trigger showResults
 }
 
@@ -438,16 +442,19 @@ function goBack() {
     render();
     return;
   }
-  if (currentSectionIdx > 0) {
+  // Go to previous section, skipping those whose condition isn't met
+  while (currentSectionIdx > 0) {
     currentSectionIdx--;
     const sec = SECTIONS[currentSectionIdx];
-    // Skip backward over sections whose condition isn't met
-    while (sec.condition && !sec.condition(allAnswers) && currentSectionIdx > 0) {
-      currentSectionIdx--;
+    if (!sec.condition || sec.condition(allAnswers)) {
+      // Found a section to enter
+      currentQIdx = sec.questions.length - 1;
+      render();
+      return;
     }
-    currentQIdx = SECTIONS[currentSectionIdx].questions.length - 1;
-    render();
   }
+  // Already at first section
+  render();
 }
 
 // ========== 评分与风险评估 ==========
